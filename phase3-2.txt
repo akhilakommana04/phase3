@@ -1,0 +1,263 @@
+Class:LoginController.java
+
+
+
+package com.simplilearn.controller;
+import java.util.List;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import com.simplilearn.dao.ProductDAO;
+import com.simplilearn.dao.UserDAO;
+import com.simplilearn.entity.Product;
+import com.simplilearn.entity.User;
+@Controller
+public class LoginController {
+
+	// inject  
+	@Autowired
+	private UserDAO userDAO;
+
+	@RequestMapping("/login")
+	public String login(Model theModel) {
+
+		return "login";
+	}
+	
+	@RequestMapping("/register")
+	public String register(Model theModel) {
+
+		return "register";
+	}
+	
+	@PostMapping("/loginProcess")
+	public String loginProcess(HttpServletRequest request, @RequestParam("username") String username,
+			@RequestParam("password") String password) {
+		
+		HttpSession session = request.getSession(true); 
+		
+		// get all users from DAO
+		List<User> users = userDAO.getUsers();
+		
+		boolean isusesr = false;
+		User tempUser = null;
+	 
+		
+		for (User user : users) {
+			
+			if (user.getUsername().equals(username) && user.getPassword().equals(password)) {
+				isusesr = true;
+				tempUser = user;
+				 
+				break;
+			}
+		}
+			
+			if (isusesr && tempUser.getType() == 0) {
+				 
+				session.setAttribute("currentUser", tempUser);
+				return "redirect:/homepage/products";
+			}
+			
+			else if (isusesr && tempUser.getType() == 1) {
+				 
+				session.setAttribute("currentUser", tempUser);
+				return "redirect:/admin/products";
+			}
+			else
+			return "login";
+	}
+	
+	
+	@PostMapping("/registerProcess")
+	public String registerProcess(@RequestParam("username") String username,
+			@RequestParam("age") String age,
+			@RequestParam("password") String password) {
+		
+		User user = new User(username, password, Integer.parseInt(age));
+		userDAO.saveUser(user);
+		
+		return "login";
+	}
+	
+}
+Class: UserController.java
+
+
+package com.simplilearn.controller;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import com.simplilearn.dao.ProductDAO;
+import com.simplilearn.dao.UserDAO;
+import com.simplilearn.entity.Product;
+import com.simplilearn.entity.User;
+
+@Controller
+@RequestMapping("/user")
+public class UserController {
+
+
+	@Autowired
+	private ProductDAO productDAO;
+	
+	// inject  
+	@Autowired
+	private UserDAO userDAO;
+
+	@GetMapping("/myaccount")
+	public String myaccount(Model theModel, HttpServletRequest request) {
+		
+		HttpSession session = request.getSession(true);
+		User currentUser = (User) session.getAttribute("currentUser");
+
+ 
+
+		// add the products to the model
+		theModel.addAttribute("currentUser", currentUser);
+
+		return "myaccount";
+	}
+	
+	
+	@PostMapping("/updateAcount")
+	public String updateAcount(HttpServletRequest request, 
+			@RequestParam("username") String username,
+			@RequestParam("age") String age,
+			@RequestParam("password") String password , Model theModel
+			) {
+		
+		HttpSession session = request.getSession(true);
+		User currentUser = (User) session.getAttribute("currentUser");
+		System.out.println(currentUser.toString());
+		
+		currentUser.setUsername(username);
+		currentUser.setAge(Integer.parseInt(age));
+		currentUser.setPassword(password);
+		
+		theModel.addAttribute("currentUser", currentUser); 
+		userDAO.saveUser(currentUser);
+
+		return "myaccount";
+	}
+
+}
+
+Package: com.simplilearm.dao
+Class:OrderDAO.java
+package com.simplilearn.dao;
+import java.util.List;
+import com.simplilearn.entity.Order;
+import com.simplilearn.entity.Product;
+import com.simplilearn.entity.User;
+public interface OrderDAO {
+	
+	public List<Order> getOrder();
+	public Order getOrder(int orderId);
+	public void saveOrder(Order order);
+	public void deleteOrder(int orderId);
+            public List<Order> getUserOrders(int userId);
+
+}
+Class: 	OrderDAOImpl.java
+
+package com.simplilearn.dao;
+import java.util.List;
+import org.hibernate.Session;
+import org.hibernate.SessionFactory;
+import org.hibernate.query.Query;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+import com.simplilearn.entity.Order;
+import com.simplilearn.entity.User;
+
+@Repository
+public class OrderDAOImpl implements OrderDAO {
+
+	// need to inject the session factory
+	@Autowired
+	private SessionFactory sessionFactory;
+
+	@Override
+	@Transactional
+	public List<Order> getOrder() {
+		// get the current hibernate session
+		Session currentSession = sessionFactory.getCurrentSession();
+
+		// create a query ... sort by last name
+		Query<Order> theQuery = currentSession.createQuery("from Order", Order.class);
+
+		// execute query and get result list
+		List<Order> orders = theQuery.getResultList();
+
+		// return the results
+		return orders;
+	}
+
+	@Override
+	@Transactional
+	public void saveOrder(Order order) {
+		// get current hibernate session
+		Session currentSession = sessionFactory.getCurrentSession();
+
+		// save/update the customer
+		currentSession.saveOrUpdate(order);
+	}
+
+	@Override
+	@Transactional
+	public Order getOrder(int orderId) {
+		// get the current hibernate session
+		Session currentSession = sessionFactory.getCurrentSession();
+
+		// now retrieve/read from database using the primary key
+		Order order = currentSession.get(Order.class, orderId);
+
+		return order;
+	}
+
+	@Override
+	@Transactional
+	public void deleteOrder(int orderId) {
+		// get the current hibernate session
+		Session currentSession = sessionFactory.getCurrentSession();
+
+		// delete object with primary key
+		Query theQuery = currentSession.createQuery("delete from Order where id=:orderId");
+		theQuery.setParameter("orderId", orderId);
+
+		theQuery.executeUpdate();
+
+	}
+
+	@Override
+	@Transactional
+	public List<Order> getUserOrders(int userId) {
+		// get the current hibernate session
+		Session currentSession = sessionFactory.getCurrentSession();
+
+		// create a query ... sort by last name
+		Query<Order> theQuery = currentSession.createQuery("from Order where user_id =: userId", Order.class);
+		theQuery.setParameter("userId", userId);
+		// execute query and get result list
+		List<Order> orders = theQuery.getResultList();
+
+		// return the results
+		return orders;
+	}
+
+}
